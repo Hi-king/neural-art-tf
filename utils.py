@@ -41,10 +41,9 @@ def save_image(im, iteration, out_dir):
 def parseArgs():
     parser = argparse.ArgumentParser(
         description='A Neural Algorithm of Artistic Style')
+    parser.add_argument('modelpath', help='Model file path')
     parser.add_argument('--model', '-m', default='vgg',
                         help='Model type (vgg, i2v)')
-    parser.add_argument('--modelpath', '-mp', default='vgg',
-                        help='Model file path')
     parser.add_argument('--content', '-c', default='images/sd.jpg',
                         help='Content image path')
     parser.add_argument('--style', '-s', default='images/style.jpg',
