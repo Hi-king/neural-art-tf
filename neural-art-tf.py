@@ -7,10 +7,25 @@ import argparse
 import time
 content_image_path, style_image_path, params_path, modeltype, width, alpha, beta, num_iters, device, args = parseArgs()
 
-# The actual calculation
 print "Read images..."
 content_image = read_image(content_image_path, width)
 style_image   = read_image(style_image_path, width)
+print(content_image.shape)
+print(style_image.shape)
+
+def gram_matrix(hidden_layer):
+    # print("hidden_layer.shape")
+    # print(dir(hidden_layer))
+    # print(hidden_layer.get_shape())
+    num_filters = int(hidden_layer.get_shape()[3])
+    # print(dir(num_filters))
+    st_shape = [-1, num_filters]
+    st_ = tf.reshape(hidden_layer, st_shape)
+    N = np.float32(int(st_.get_shape()[0]))
+    st = tf.matmul(tf.transpose(st_), st_)/N**2
+    return st
+
+
 g = tf.Graph()
 with g.device(device), g.as_default(), tf.Session(graph=g, config=tf.ConfigProto(allow_soft_placement=True)) as sess:
     print "Load content values..."
@@ -24,31 +39,38 @@ with g.device(device), g.as_default(), tf.Session(graph=g, config=tf.ConfigProto
     y = model.y()
     style_image_st_val = []
     for l in range(len(y)):
-        num_filters = content_image_y_val[l].shape[3]
-        st_shape = [-1, num_filters]
-        st_ = tf.reshape(y[l], st_shape)
-        st = tf.matmul(tf.transpose(st_), st_)
+        # num_filters = content_image_y_val[l].shape[3]
+        # st_shape = [-1, num_filters]
+        # st_ = tf.reshape(y[l], st_shape)
+        # st = tf.matmul(tf.transpose(st_), st_)
+        st = gram_matrix(y[l])
         style_image_st_val.append(sess.run(st))  # sess.run(st) is a constant numpy array
     
     print "Construct graph..."
     # Start from white noise
-    # gen_image = tf.Variable(tf.truncated_normal(content_image.shape, stddev=20), trainable=True, name='gen_image')
+    gen_image = tf.Variable(tf.truncated_normal(content_image.shape, stddev=20), trainable=True, name='gen_image')
     # Start from the original image
-    gen_image = tf.Variable(tf.constant(np.array(content_image, dtype=np.float32)), trainable=True, name='gen_image')
+    # gen_image = tf.Variable(tf.constant(np.array(content_image, dtype=np.float32)), trainable=True, name='gen_image')
     model = getModel(gen_image, params_path, modeltype)
     y = model.y()
     L_content = 0.0
     L_style   = 0.0
     for l in range(len(y)):
         # Content loss
-        L_content += model.alpha[l]*tf.nn.l2_loss(y[l] - content_image_y_val[l])
+        layer_shape = [int(dim) for dim in y[l].get_shape()]
+        L_content += model.alpha[l]*tf.nn.l2_loss(y[l] - content_image_y_val[l])/layer_shape[1]/layer_shape[2]/layer_shape[3]/len(y)
+        # L_content += model.alpha[l]*tf.nn.l2_loss(y[l] - content_image_y_val[l])
+        print("layer size" )
+        print(y[l].get_shape())
+
         # Style loss
-        num_filters = content_image_y_val[l].shape[3]
-        st_shape = [-1, num_filters]
-        st_ = tf.reshape(y[l], st_shape)
-        st = tf.matmul(tf.transpose(st_), st_)
-        N = np.prod(content_image_y_val[l].shape).astype(np.float32)
-        L_style += model.beta[l]*tf.nn.l2_loss(st - style_image_st_val[l])/N**2/len(y)
+        # num_filters = content_image_y_val[l].shape[3]
+        # st_shape = [-1, num_filters]
+        # st_ = tf.reshape(y[l], st_shape)
+        # N = st_.shape[1].astype(np.float32)
+        # st = tf.matmul(tf.transpose(st_), st_)/N**2/len(y)
+        st = gram_matrix(y[l])
+        L_style += model.beta[l]*tf.nn.l2_loss(st - style_image_st_val[l])/np.prod(style_image_st_val[l].shape[1:])
     # The loss
     L = alpha* L_content + beta * L_style
     # The optimizer
@@ -61,7 +83,7 @@ with g.device(device), g.as_default(), tf.Session(graph=g, config=tf.ConfigProto
     # Set up the summary writer (saving summaries is optional)
     # (do `tensorboard --logdir=/tmp/na-logs` to view it)
     tf.scalar_summary("L_content", L_content)
-    tf.scalar_summary("L_style", L_style)
+    #tf.scalar_summary("L_style", L_style)
     gen_image_addmean = tf.Variable(tf.constant(np.array(content_image, dtype=np.float32)), trainable=False)
     tf.image_summary("Generated image (TODO: add mean)", gen_image_addmean)
     summary_op = tf.merge_all_summaries()

@@ -22,6 +22,8 @@ def read_image(path, w=None):
     if w:
         r = w / np.float32(img.shape[1])
         img = scipy.misc.imresize(img, (int(img.shape[0]*r), int(img.shape[1]*r)))
+    if img.shape[2] == 4: # RGBA
+        img = img[:, :, :3]
     img = img.astype(np.float32)
     img = img[None, ...]
     # Subtract the image mean
