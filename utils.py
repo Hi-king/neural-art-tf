@@ -58,6 +58,7 @@ def parseArgs():
                         help='alpha (content weight)')
     parser.add_argument('--beta', '-b', default=200.0, type=float,
                         help='beta (style weight)')
+    parser.add_argument('--lr', default=4.0, type=float)
     parser.add_argument('--device', default="/cpu:0")
     parser.add_argument('--out_dir', default="output")
     args = parser.parse_args()
